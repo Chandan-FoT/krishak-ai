@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { 
   Sprout, UploadCloud, MapPin, Thermometer, Mic, Send,
-  ShieldCheck, TrendingUp, Landmark, Leaf, LocateFixed, MessageSquare, ArrowRight, Store, Camera
+  ShieldCheck, TrendingUp, Landmark, Leaf, LocateFixed, MessageSquare, ArrowRight, Store, Camera,
+  Volume2, Square // Added Square icon for the Stop feature
 } from 'lucide-react';
 import { extractSoilData, getGeminiChatResponse } from '../lib/gemini'; 
 import { getWeatherData } from '../lib/weather';
@@ -14,6 +15,7 @@ export default function KrishakDashboard() {
   const [loading, setLoading] = useState(false);
   const [prediction, setPrediction] = useState(null);
   const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false); // NEW: Track speech state
   const [chatInput, setChatInput] = useState("");
   const [messages, setMessages] = useState([]);
   
@@ -36,13 +38,43 @@ export default function KrishakDashboard() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // --- NEW: STOP SPEECH LOGIC ---
+  const handleStopSpeaking = () => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  };
+
+  // --- UPDATED: SPEAKER LOGIC (ZERO COST) ---
+  const handleSpeak = (text) => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'hi-IN';
+      utterance.rate = 0.9;
+      
+      const voices = window.speechSynthesis.getVoices();
+      const hindiVoice = voices.find(v => v.lang.includes('hi'));
+      if (hindiVoice) utterance.voice = hindiVoice;
+
+      // Update state when speaking starts and ends
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
   const handleLocationDetection = async () => {
     try {
       const loc = await getUserLocation();
       setUserPlace({ city: loc.city, state: loc.state });
       const weather = await getWeatherData(loc.lat, loc.lon);
       if (weather) {
-        // Ensure forecast data is filtered to exactly 5 days if needed by getWeatherData
         setCurrentWeather({ 
           temp: weather.currentTemp, condition: weather.currentCondition, 
           icon: weather.currentIcon, forecast: weather.fiveDayForecast || []
@@ -154,7 +186,6 @@ export default function KrishakDashboard() {
         
         {/* LEFT COLUMN: WEATHER, SOIL SCAN & PORTAL */}
         <div className="lg:col-span-1 space-y-6">
-          {/* RESTORED 5-DAY WEATHER CARD */}
           <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-2 font-black text-slate-800 text-sm">
@@ -166,7 +197,6 @@ export default function KrishakDashboard() {
               </button>
             </div>
             
-            {/* Current Weather Header */}
             <div className="grid grid-cols-2 gap-4 mb-6 text-center font-black">
               <div className="bg-orange-50/50 p-4 rounded-2xl border border-orange-100">
                 <p className="text-3xl text-slate-900">{currentWeather.temp}</p>
@@ -183,7 +213,6 @@ export default function KrishakDashboard() {
               </div>
             </div>
 
-            {/* Restored 5-Day Forecast Row */}
             <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide pt-2">
               {currentWeather.forecast?.map((day, idx) => (
                 <div key={idx} className="bg-slate-50 p-4 rounded-3xl text-center min-w-[85px] border border-slate-100 flex flex-col items-center transition-all hover:bg-white hover:shadow-md">
@@ -242,7 +271,18 @@ export default function KrishakDashboard() {
 
         {/* RIGHT COLUMN: SCROLLABLE CHAT WITH CAMERA */}
         <div className="lg:col-span-2">
-          <div className="bg-emerald-900 h-[700px] rounded-[3rem] text-white shadow-2xl flex flex-col overflow-hidden">
+          <div className="bg-emerald-900 h-[700px] rounded-[3rem] text-white shadow-2xl flex flex-col overflow-hidden relative">
+            
+            {/* NEW: GLOBAL STOP BUTTON (Appears only when AI is speaking) */}
+            {isSpeaking && (
+              <button 
+                onClick={handleStopSpeaking}
+                className="absolute top-24 right-10 z-50 flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-2xl shadow-2xl animate-pulse transition-all font-black uppercase text-[10px] tracking-widest"
+              >
+                <Square size={14} fill="white" /> Stop Listening (बंद करें)
+              </button>
+            )}
+
             <div className="p-8 pb-4 flex items-center gap-3 border-b border-emerald-800/50">
               <div className="bg-emerald-800 p-3 rounded-2xl shadow-inner"><MessageSquare size={24} className="text-emerald-400" /></div>
               <div>
@@ -261,13 +301,35 @@ export default function KrishakDashboard() {
               )}
               {messages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] p-6 rounded-3xl text-sm leading-relaxed shadow-lg ${
+                  <div className={`relative max-w-[85%] p-6 rounded-3xl text-sm leading-relaxed shadow-lg ${
                     m.role === 'user' ? 'bg-emerald-800 border border-emerald-700 rounded-tr-none' : 'bg-slate-800 border border-slate-700 rounded-tl-none font-medium'
                   }`}>
                     {m.image && (
                       <img src={m.image} alt="plant" className="w-full h-40 object-cover rounded-xl mb-3 border-2 border-emerald-500 shadow-md" />
                     )}
                     {m.text}
+                    
+                    {/* SPEAK BUTTON FOR AI MESSAGES */}
+                    {m.role === 'ai' && (
+                      <div className="flex gap-4 mt-3">
+                        <button 
+                          onClick={() => handleSpeak(m.text)}
+                          className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:text-emerald-300 transition-colors"
+                        >
+                          <Volume2 size={14} /> Listen (सुनें)
+                        </button>
+                        
+                        {/* INLINE STOP (Optional addition) */}
+                        {isSpeaking && (
+                          <button 
+                            onClick={handleStopSpeaking}
+                            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-red-400 hover:text-red-300 transition-colors"
+                          >
+                            <Square size={12} fill="currentColor" /> Stop
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
