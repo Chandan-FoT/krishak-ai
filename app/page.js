@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { 
-  Sprout, UploadCloud, MapPin, Thermometer, Mic, Send,
-  ShieldCheck, TrendingUp, Landmark, Leaf, LocateFixed, MessageSquare, ArrowRight, Store, Camera,
-  Volume2, Square // Added Square icon for the Stop feature
+  Sprout, UploadCloud, MapPin, Mic, Send,
+  Leaf, LocateFixed, MessageSquare, ArrowRight, Store, Camera,
+  Volume2, Square 
 } from 'lucide-react';
 import { extractSoilData, getGeminiChatResponse } from '../lib/gemini'; 
 import { getWeatherData } from '../lib/weather';
@@ -15,7 +15,7 @@ export default function KrishakDashboard() {
   const [loading, setLoading] = useState(false);
   const [prediction, setPrediction] = useState(null);
   const [isListening, setIsListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false); // NEW: Track speech state
+  const [isSpeaking, setIsSpeaking] = useState(false); 
   const [chatInput, setChatInput] = useState("");
   const [messages, setMessages] = useState([]);
   
@@ -38,7 +38,7 @@ export default function KrishakDashboard() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // --- NEW: STOP SPEECH LOGIC ---
+  // --- STOP SPEECH LOGIC ---
   const handleStopSpeaking = () => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -46,12 +46,10 @@ export default function KrishakDashboard() {
     }
   };
 
-  // --- UPDATED: SPEAKER LOGIC (ZERO COST) ---
+  // --- SPEAKER LOGIC ---
   const handleSpeak = (text) => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
-      // Cancel any ongoing speech
       window.speechSynthesis.cancel();
-
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'hi-IN';
       utterance.rate = 0.9;
@@ -60,7 +58,6 @@ export default function KrishakDashboard() {
       const hindiVoice = voices.find(v => v.lang.includes('hi'));
       if (hindiVoice) utterance.voice = hindiVoice;
 
-      // Update state when speaking starts and ends
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
@@ -110,7 +107,7 @@ export default function KrishakDashboard() {
         );
         setMessages(prev => [...prev, { role: 'ai', text: response }]);
       } catch (error) {
-        setMessages(prev => [...prev, { role: 'ai', text: "Galti hui! Photo theek se upload nahi ho payi." }]);
+        setMessages(prev => [...prev, { role: 'ai', text: "Error uploading photo." }]);
       } finally {
         setLoading(false);
       }
@@ -143,7 +140,7 @@ export default function KrishakDashboard() {
       const response = await getGeminiChatResponse(chatInput, currentWeather, userPlace);
       setMessages(prev => [...prev, { role: 'ai', text: response }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'ai', text: "Connectivity samasya hai." }]);
+      setMessages(prev => [...prev, { role: 'ai', text: "Connection error." }]);
     } finally {
       setLoading(false);
     }
@@ -184,8 +181,26 @@ export default function KrishakDashboard() {
 
       <main className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         
-        {/* LEFT COLUMN: WEATHER, SOIL SCAN & PORTAL */}
+        {/* LEFT COLUMN: WEATHER & SOIL SCAN */}
         <div className="lg:col-span-1 space-y-6">
+          
+          <Link href="/doctor">
+            <div className="mb-6 bg-emerald-600 rounded-[2.5rem] p-8 text-white shadow-xl hover:bg-emerald-700 transition-all cursor-pointer relative overflow-hidden group">
+              <div className="relative z-10 flex flex-col gap-2">
+                <div className="bg-white/20 w-fit p-3 rounded-2xl backdrop-blur-sm mb-2">
+                    <Sprout size={32} />
+                </div>
+                <h3 className="text-3xl font-black uppercase italic tracking-tighter">
+                  Open Crop Doctor
+                </h3>
+                <p className="font-medium opacity-90 text-sm tracking-wide">
+                  Click to scan leaves & detect diseases
+                </p>
+              </div>
+              <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-emerald-500/30 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500"></div>
+            </div>
+          </Link>
+
           <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-2 font-black text-slate-800 text-sm">
@@ -256,24 +271,14 @@ export default function KrishakDashboard() {
               </div>
             )}
           </div>
-
-          <Link href="/mandi" className="block transform transition-all hover:scale-[1.02] active:scale-[0.98]">
-            <button style={{ backgroundColor: '#065f46', color: '#ffffff' }} className="w-full py-8 rounded-[2.5rem] shadow-2xl flex flex-col items-center justify-center gap-2 border-b-[10px] border-[#043d2c] outline-none">
-              <div className="flex items-center gap-4">
-                <Store size={26} className="text-emerald-300" />
-                <span className="text-xl font-black uppercase tracking-tighter italic">VIEW MARKET PORTAL</span>
-                <ArrowRight size={26} className="text-emerald-300" />
-              </div>
-              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-emerald-100/90 tracking-widest">LIVE AGMARKNET PRICES 2026</span>
-            </button>
-          </Link>
         </div>
 
-        {/* RIGHT COLUMN: SCROLLABLE CHAT WITH CAMERA */}
-        <div className="lg:col-span-2">
+        {/* RIGHT COLUMN: CHAT & MARKET */}
+        <div className="lg:col-span-2 space-y-6">
+          
+          {/* CHATBOT (Height Reduced to 500px) */}
           <div className="bg-emerald-900 h-[700px] rounded-[3rem] text-white shadow-2xl flex flex-col overflow-hidden relative">
             
-            {/* NEW: GLOBAL STOP BUTTON (Appears only when AI is speaking) */}
             {isSpeaking && (
               <button 
                 onClick={handleStopSpeaking}
@@ -309,7 +314,6 @@ export default function KrishakDashboard() {
                     )}
                     {m.text}
                     
-                    {/* SPEAK BUTTON FOR AI MESSAGES */}
                     {m.role === 'ai' && (
                       <div className="flex gap-4 mt-3">
                         <button 
@@ -319,7 +323,6 @@ export default function KrishakDashboard() {
                           <Volume2 size={14} /> Listen (सुनें)
                         </button>
                         
-                        {/* INLINE STOP (Optional addition) */}
                         {isSpeaking && (
                           <button 
                             onClick={handleStopSpeaking}
@@ -361,6 +364,19 @@ export default function KrishakDashboard() {
               </div>
             </div>
           </div>
+
+          {/* MARKET PORTAL BUTTON (Moved Below Chat) */}
+          <Link href="/mandi" className="block transform transition-all hover:scale-[1.02] active:scale-[0.98]">
+            <button style={{ backgroundColor: '#065f46', color: '#ffffff' }} className="w-full py-8 rounded-[2.5rem] shadow-2xl flex flex-col items-center justify-center gap-2 border-b-[10px] border-[#043d2c] outline-none">
+              <div className="flex items-center gap-4">
+                <Store size={26} className="text-emerald-300" />
+                <span className="text-xl font-black uppercase tracking-tighter italic">VIEW MARKET PORTAL</span>
+                <ArrowRight size={26} className="text-emerald-300" />
+              </div>
+              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-emerald-100/90 tracking-widest">LIVE AGMARKNET PRICES 2026</span>
+            </button>
+          </Link>
+
         </div>
       </main>
 
